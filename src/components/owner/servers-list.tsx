@@ -133,16 +133,21 @@ export default function ServersList() {
       if (response.ok) {
         const data = await response.json();
         if (data.settings) {
+          // Convert empty string to "none" for Select component
+          const normalizedSettings = {
+            ...data.settings,
+            assignedUserId: data.settings.assignedUserId || "none"
+          };
           setServerSettings(prev => ({
             ...prev,
-            [serverId]: data.settings
+            [serverId]: normalizedSettings
           }));
         } else {
           // Set default settings if none exist
           setServerSettings(prev => ({
             ...prev,
             [serverId]: {
-              assignedUserId: '',
+              assignedUserId: 'none',
               panelUrl: '',
               txadminUrl: '',
               databaseHost: '',
@@ -190,16 +195,21 @@ export default function ServersList() {
       if (response.ok) {
         const data = await response.json();
         if (data.settings) {
+          // Convert empty string to "none" for Select component
+          const normalizedSettings = {
+            ...data.settings,
+            assignedUserId: data.settings.assignedUserId || "none"
+          };
           setServerSettings(prev => ({
             ...prev,
-            [serverId]: data.settings
+            [serverId]: normalizedSettings
           }));
         } else {
           // Set default settings if none exist
           setServerSettings(prev => ({
             ...prev,
             [serverId]: {
-              assignedUserId: '',
+              assignedUserId: 'none',
               panelUrl: '',
               txadminUrl: '',
               databaseHost: '',
@@ -257,8 +267,13 @@ export default function ServersList() {
       }
 
       const currentSettings = serverSettings[settingsServer] || {};
+      // Convert "none" back to empty string for database storage
+      const cleanSettings = {
+        ...currentSettings,
+        assignedUserId: currentSettings.assignedUserId === "none" ? "" : currentSettings.assignedUserId
+      };
       const payload = { 
-        settings: currentSettings
+        settings: cleanSettings
       };
       console.log('🔍 Payload:', JSON.stringify(payload, null, 2));
 
@@ -286,9 +301,14 @@ export default function ServersList() {
         
         // Update local state with response data
         if (responseData.settings) {
+          // Convert empty string to "none" for Select component
+          const normalizedSettings = {
+            ...responseData.settings,
+            assignedUserId: responseData.settings.assignedUserId || "none"
+          };
           setServerSettings(prev => ({
             ...prev,
-            [settingsServer]: responseData.settings
+            [settingsServer]: normalizedSettings
           }));
         }
         
@@ -1005,12 +1025,12 @@ export default function ServersList() {
                 Assign to User
               </Label>
               <Select
-                value={serverSettings[settingsServer]?.assignedUser || ''}
+                value={serverSettings[settingsServer]?.assignedUser || "none"}
                 onValueChange={(value) => setServerSettings(prev => ({ 
                   ...prev, 
                   [settingsServer]: {
                     ...prev[settingsServer],
-                    assignedUser: value 
+                    assignedUser: value === "none" ? "" : value 
                   }
                 }))}
               >
@@ -1018,7 +1038,8 @@ export default function ServersList() {
                   <SelectValue placeholder="Select user..." />
                 </SelectTrigger>
                 <SelectContent className="bg-gray-800 border-white/20">
-                  {users.map((user) => (
+                  <SelectItem value="none">-- No User Assigned --</SelectItem>
+                  {users.filter(user => user.id && user.id !== '').map((user) => (
                     <SelectItem key={user.id} value={user.id.toString()}>
                       {user.name} ({user.email})
                     </SelectItem>

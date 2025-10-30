@@ -55,6 +55,7 @@ import DepositManagement from '@/components/DepositManagement'
 import PaymentSettings from '@/components/owner/PaymentSettings'
 import ServersList from '@/components/owner/servers-list'
 import ApiManagement from '@/components/owner/api-management'
+import DatabaseManagement from '@/components/owner/DatabaseManagement'
 
 export default function OwnerPanel() {
   const [user, setUser] = useState<any>(null)
@@ -318,6 +319,7 @@ export default function OwnerPanel() {
       submenu: [
         { id: 'payment', label: 'Payment', icon: <DollarSign className="w-4 h-4" /> },
         { id: 'api', label: 'API', icon: <Terminal className="w-4 h-4" /> },
+        { id: 'database', label: 'Database', icon: <Database className="w-4 h-4" /> },
         { id: 'website', label: 'Website', icon: <Globe className="w-4 h-4" />, comingSoon: true }
       ]
     },
@@ -795,6 +797,8 @@ export default function OwnerPanel() {
                 {activeSettingsTab === 'payment' && <PaymentSettings />}
                 
                 {activeSettingsTab === 'api' && <ApiManagement />}
+                
+                {activeSettingsTab === 'database' && <DatabaseManagement />}
                 
                 {activeSettingsTab === 'website' && (
                   <Card className="bg-black/40 backdrop-blur-2xl border border-white/10">

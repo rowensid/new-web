@@ -86,6 +86,18 @@ export default function DatabaseControl() {
   const [createTableOpen, setCreateTableOpen] = useState(false)
   const [newTableName, setNewTableName] = useState('')
   const [newTableColumns, setNewTableColumns] = useState('')
+  const [editRowOpen, setEditRowOpen] = useState(false)
+  const [editingRow, setEditingRow] = useState<any>(null)
+  const [editFormData, setEditFormData] = useState<Record<string, any>>({})
+  const [addRowOpen, setAddRowOpen] = useState(false)
+  const [addFormData, setAddFormData] = useState<Record<string, any>>({})
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [deletingRow, setDeletingRow] = useState<any>(null)
+  const [tableSchema, setTableSchema] = useState<any[]>([])
+  const [tableInfo, setTableInfo] = useState<any>(null)
+  const [pageSize, setPageSize] = useState(25)
+  const [sortBy, setSortBy] = useState<string>('')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   const [tablePage, setTablePage] = useState(1)
   const [tableSearch, setTableSearch] = useState('')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
@@ -152,14 +164,19 @@ export default function DatabaseControl() {
     }
   }
 
-  const fetchTableData = async (tableName: string, page: number = 1, search: string = '') => {
-    if (!selectedServer) return
-    
+  const fetchTableData = async (tableName: string, page: number = 1, search: string = '', sortColumn: string = '', sortDir: 'asc' | 'desc' = 'asc') => {
     try {
       const token = localStorage.getItem('auth_token')
-      const apiUrl = (user?.role === 'ADMIN' || user?.role === 'OWNER')
-        ? `/api/admin/table-data?serverId=${selectedServer.pteroId}&table=${tableName}&page=${page}&search=${search}`
-        : `/api/user/table-data?serverId=${selectedServer.pteroId}&table=${tableName}&page=${page}&search=${search}`
+      
+      // Try local database first (our main database)
+      let apiUrl = `/api/admin/local-table-data?table=${tableName}&page=${page}&search=${search}&sort=${sortColumn}&order=${sortDir}&limit=${pageSize}`
+      
+      if (selectedServer && selectedServer.databaseSettings) {
+        // If server has database settings, use remote database
+        apiUrl = (user?.role === 'ADMIN' || user?.role === 'OWNER')
+          ? `/api/admin/table-data?serverId=${selectedServer.pteroId}&table=${tableName}&page=${page}&search=${search}&sort=${sortColumn}&order=${sortDir}&limit=${pageSize}`
+          : `/api/user/table-data?serverId=${selectedServer.pteroId}&table=${tableName}&page=${page}&search=${search}&sort=${sortColumn}&order=${sortDir}&limit=${pageSize}`
+      }
         
       const response = await fetch(apiUrl, {
         headers: {
@@ -170,6 +187,9 @@ export default function DatabaseControl() {
       if (response.ok) {
         const data = await response.json()
         setTableData(data)
+        // Also fetch table schema and info
+        await fetchTableSchema(tableName)
+        await fetchTableInfo(tableName)
       } else {
         const errorData = await response.json()
         toast.error(errorData.error || 'Failed to fetch table data')
@@ -180,22 +200,87 @@ export default function DatabaseControl() {
     }
   }
 
+  const fetchTableSchema = async (tableName: string) => {
+    try {
+      const token = localStorage.getItem('auth_token')
+      
+      // Try local database first
+      let apiUrl = `/api/admin/local-table-schema?table=${tableName}`
+      
+      if (selectedServer && selectedServer.databaseSettings) {
+        // If server has database settings, use remote database
+        apiUrl = (user?.role === 'ADMIN' || user?.role === 'OWNER')
+          ? `/api/admin/table-schema?serverId=${selectedServer.pteroId}&table=${tableName}`
+          : `/api/user/table-schema?serverId=${selectedServer.pteroId}&table=${tableName}`
+      }
+        
+      const response = await fetch(apiUrl, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        setTableSchema(data.schema || [])
+      }
+    } catch (error) {
+      console.error('Failed to fetch table schema:', error)
+    }
+  }
+
+  const fetchTableInfo = async (tableName: string) => {
+    try {
+      const token = localStorage.getItem('auth_token')
+      
+      // Get table info using API
+      let apiUrl = '/api/admin/local-table-info'
+      
+      if (selectedServer && selectedServer.databaseSettings) {
+        // If server has database settings, use remote database
+        apiUrl = (user?.role === 'ADMIN' || user?.role === 'OWNER')
+          ? '/api/admin/table-info'
+          : '/api/user/table-info'
+      }
+      
+      const response = await fetch(`${apiUrl}?table=${tableName}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        setTableInfo(data.tableInfo)
+      }
+    } catch (error) {
+      console.error('Failed to fetch table info:', error)
+    }
+  }
+
   const selectTable = (tableName: string) => {
     setSelectedTable(tableName)
     setTablePage(1)
     setTableSearch('')
+    setSortBy('')
+    setSortOrder('asc')
     fetchTableData(tableName)
   }
 
   const deleteRow = async (tableName: string, id: any) => {
-    if (!selectedServer) return
-    
     try {
       const token = localStorage.getItem('auth_token')
-      const apiUrl = (user?.role === 'ADMIN' || user?.role === 'OWNER')
-        ? '/api/admin/delete-row'
-        : '/api/user/delete-row'
-        
+      
+      // Try local database first
+      let apiUrl = '/api/admin/local-delete-row'
+      
+      if (selectedServer && selectedServer.databaseSettings) {
+        // If server has database settings, use remote database
+        apiUrl = (user?.role === 'ADMIN' || user?.role === 'OWNER')
+          ? '/api/admin/delete-row'
+          : '/api/user/delete-row'
+      }
+      
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
@@ -203,7 +288,6 @@ export default function DatabaseControl() {
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          serverId: selectedServer.pteroId,
           table: tableName,
           id: id
         })
@@ -211,7 +295,9 @@ export default function DatabaseControl() {
       
       if (response.ok) {
         toast.success('Row deleted successfully')
-        fetchTableData(tableName, tablePage, tableSearch)
+        fetchTableData(tableName, tablePage, tableSearch, sortBy, sortOrder)
+        setDeleteConfirmOpen(false)
+        setDeletingRow(null)
       } else {
         const errorData = await response.json()
         toast.error(errorData.error || 'Failed to delete row')
@@ -222,9 +308,126 @@ export default function DatabaseControl() {
     }
   }
 
+  const addRow = async (tableName: string, data: Record<string, any>) => {
+    try {
+      const token = localStorage.getItem('auth_token')
+      
+      // Try local database first
+      let apiUrl = '/api/admin/local-add-row'
+      
+      if (selectedServer && selectedServer.databaseSettings) {
+        // If server has database settings, use remote database
+        apiUrl = (user?.role === 'ADMIN' || user?.role === 'OWNER')
+          ? '/api/admin/add-row'
+          : '/api/user/add-row'
+      }
+        
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          table: tableName,
+          data: data
+        })
+      })
+      
+      if (response.ok) {
+        const result = await response.json()
+        toast.success('Row added successfully')
+        setAddRowOpen(false)
+        setAddFormData({})
+        fetchTableData(tableName, tablePage, tableSearch, sortBy, sortOrder)
+      } else {
+        const errorData = await response.json()
+        toast.error(errorData.error || 'Failed to add row')
+      }
+    } catch (error) {
+      console.error('Failed to add row:', error)
+      toast.error('Failed to add row')
+    }
+  }
+
+  const updateRow = async (tableName: string, id: any, data: Record<string, any>) => {
+    try {
+      const token = localStorage.getItem('auth_token')
+      
+      // Try local database first
+      let apiUrl = '/api/admin/local-update-row'
+      
+      if (selectedServer && selectedServer.databaseSettings) {
+        // If server has database settings, use remote database
+        apiUrl = (user?.role === 'ADMIN' || user?.role === 'OWNER')
+          ? '/api/admin/update-row'
+          : '/api/user/update-row'
+      }
+        
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          table: tableName,
+          id: id,
+          data: data
+        })
+      })
+      
+      if (response.ok) {
+        const result = await response.json()
+        toast.success('Row updated successfully')
+        setEditRowOpen(false)
+        setEditingRow(null)
+        setEditFormData({})
+        fetchTableData(tableName, tablePage, tableSearch, sortBy, sortOrder)
+      } else {
+        const errorData = await response.json()
+        toast.error(errorData.error || 'Failed to update row')
+      }
+    } catch (error) {
+      console.error('Failed to update row:', error)
+      toast.error('Failed to update row')
+    }
+  }
+
+
+  const openEditDialog = (row: any) => {
+    setEditingRow(row)
+    setEditFormData({...row})
+    setEditRowOpen(true)
+  }
+
+  const openDeleteDialog = (row: any) => {
+    setDeletingRow(row)
+    setDeleteConfirmOpen(true)
+  }
+
+  const handleSort = (column: string) => {
+    if (sortBy === column) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortBy(column)
+      setSortOrder('asc')
+    }
+    setTablePage(1)
+  }
+
+  const handleSearch = (search: string) => {
+    setTableSearch(search)
+    setTablePage(1)
+  }
+
+  const handlePageChange = (page: number) => {
+    setTablePage(page)
+  }
+
   const refreshTable = () => {
     if (selectedTable) {
-      fetchTableData(selectedTable, tablePage, tableSearch)
+      fetchTableData(selectedTable, tablePage, tableSearch, sortBy, sortOrder)
     }
   }
 
@@ -236,9 +439,10 @@ export default function DatabaseControl() {
     setTableData(null)
     setQueryResult(null)
     
-    // Check if server has database settings
+    // If server has database settings, use it. Otherwise, use local database
     if (!server.databaseSettings) {
-      toast.error('This server does not have database settings configured')
+      // Use local database (no server required)
+      await fetchTables()
       return
     }
     
@@ -270,13 +474,18 @@ export default function DatabaseControl() {
   }
 
   const fetchTables = async () => {
-    if (!selectedServer) return
-    
     try {
       const token = localStorage.getItem('auth_token')
-      const apiUrl = (user?.role === 'ADMIN' || user?.role === 'OWNER')
-        ? `/api/admin/database-tables?serverId=${selectedServer.pteroId}`
-        : `/api/user/database-tables?serverId=${selectedServer.pteroId}`
+      
+      // Try local database first
+      let apiUrl = '/api/admin/database-tables'
+      
+      if (selectedServer && selectedServer.databaseSettings) {
+        // If server has database settings, use remote database
+        apiUrl = (user?.role === 'ADMIN' || user?.role === 'OWNER')
+          ? '/api/admin/database-tables'
+          : '/api/user/database-tables'
+      }
         
       const response = await fetch(apiUrl, {
         headers: {

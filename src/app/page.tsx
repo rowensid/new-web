@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Monitor, Server, Code, Gamepad2, Users, Zap, Shield, Globe, ChevronRight, Menu, X, TrendingUp, Activity, Clock, Star, Cpu, Database, Cloud, Lock } from 'lucide-react'
+import { Monitor, Server, Code, Gamepad2, Users, Zap, Shield, Globe, ChevronRight, Menu, X, TrendingUp, Activity, Clock, Star, Cpu, Database, Cloud, Lock, Phone, MapPin } from 'lucide-react'
 import Link from 'next/link'
 import Logo from '@/components/logo'
 
@@ -25,6 +25,13 @@ export default function Home() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [stats, setStats] = useState<StatsData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [contactForm, setContactForm] = useState({
+    name: '',
+    email: '',
+    message: ''
+  })
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitMessage, setSubmitMessage] = useState('')
 
   useEffect(() => {
     const handleScroll = () => {
@@ -51,6 +58,40 @@ export default function Home() {
     const interval = setInterval(fetchStats, 30000)
     return () => clearInterval(interval)
   }, [])
+
+  const handleContactSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsSubmitting(true)
+    setSubmitMessage('')
+
+    try {
+      const response = await fetch('/api/contact', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(contactForm),
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        setSubmitMessage('Pesan Anda telah terkirim! Kami akan segera menghubungi Anda.')
+        setContactForm({ name: '', email: '', message: '' })
+      } else {
+        setSubmitMessage(data.error || 'Terjadi kesalahan. Silakan coba lagi.')
+      }
+    } catch (error) {
+      setSubmitMessage('Terjadi kesalahan. Silakan coba lagi.')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target
+    setContactForm(prev => ({ ...prev, [name]: value }))
+  }
 
   const services = [
     {
@@ -418,6 +459,145 @@ export default function Home() {
               </div>
             </CardContent>
           </Card>
+        </div>
+      </section>
+
+      {/* Contact Section */}
+      <section id="contact" className="py-20 px-4 bg-gradient-to-b from-black to-gray-900/50">
+        <div className="container mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl md:text-5xl font-bold mb-4">
+              <span className="bg-gradient-to-r from-pink-500 to-purple-600 bg-clip-text text-transparent">
+                Hubungi Kami
+              </span>
+            </h2>
+            <p className="text-xl text-gray-300 max-w-2xl mx-auto">
+              Ada pertanyaan? Kami siap membantu anda menemukan solusi terbaik untuk kebutuhan digital anda.
+            </p>
+          </div>
+          
+          <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+            <Card className="bg-gray-900/50 border-white/10 backdrop-blur-lg">
+              <CardHeader>
+                <CardTitle className="text-2xl text-white">Kirim Pesan</CardTitle>
+                <CardDescription className="text-gray-300">
+                  Isi form di bawah ini dan kami akan segera menghubungi anda
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleContactSubmit} className="space-y-4">
+                  <div>
+                    <label htmlFor="name" className="block text-sm font-medium text-gray-300 mb-2">
+                      Nama Lengkap
+                    </label>
+                    <input
+                      id="name"
+                      name="name"
+                      type="text"
+                      value={contactForm.name}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500"
+                      placeholder="Masukkan nama Anda"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
+                      Email
+                    </label>
+                    <input
+                      id="email"
+                      name="email"
+                      type="email"
+                      value={contactForm.email}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500"
+                      placeholder="email@example.com"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="message" className="block text-sm font-medium text-gray-300 mb-2">
+                      Pesan
+                    </label>
+                    <textarea
+                      id="message"
+                      name="message"
+                      value={contactForm.message}
+                      onChange={handleInputChange}
+                      rows={4}
+                      className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500"
+                      placeholder="Tuliskan pesan Anda di sini..."
+                      required
+                    />
+                  </div>
+                  <Button 
+                    type="submit" 
+                    disabled={isSubmitting}
+                    className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700"
+                  >
+                    {isSubmitting ? 'Mengirim...' : 'Kirim Pesan'}
+                  </Button>
+                  {submitMessage && (
+                    <div className={`text-sm ${submitMessage.includes('error') ? 'text-red-400' : 'text-green-400'}`}>
+                      {submitMessage}
+                    </div>
+                  )}
+                </form>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gray-900/50 border-white/10 backdrop-blur-lg">
+              <CardHeader>
+                <CardTitle className="text-2xl text-white">Informasi Kontak</CardTitle>
+                <CardDescription className="text-gray-300">
+                  Berbagai cara untuk menghubungi kami
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="flex items-center space-x-4">
+                  <div className="w-12 h-12 bg-gradient-to-r from-pink-500 to-purple-600 rounded-lg flex items-center justify-center">
+                    <Globe className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-white">Email</p>
+                    <p className="text-gray-400">info@asstudio.com</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center space-x-4">
+                  <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-blue-600 rounded-lg flex items-center justify-center">
+                    <Phone className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-white">Telepon</p>
+                    <p className="text-gray-400">+62 812-3456-7890</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center space-x-4">
+                  <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-pink-500 rounded-lg flex items-center justify-center">
+                    <MapPin className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-white">Alamat</p>
+                    <p className="text-gray-400">Jakarta, Indonesia</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center space-x-4">
+                  <div className="w-12 h-12 bg-gradient-to-r from-pink-500 to-purple-600 rounded-lg flex items-center justify-center">
+                    <Clock className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-white">Jam Operasional</p>
+                    <p className="text-gray-400">Senin - Jumat: 09:00 - 18:00</p>
+                    <p className="text-gray-400">Sabtu: 09:00 - 15:00</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </section>
 

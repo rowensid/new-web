@@ -50,6 +50,9 @@ export async function GET(request: NextRequest) {
     const table = searchParams.get('table');
     const page = parseInt(searchParams.get('page') || '1');
     const search = searchParams.get('search') || '';
+    const sort = searchParams.get('sort') || 'id';
+    const order = searchParams.get('order') || 'desc';
+    const limit = parseInt(searchParams.get('limit') || '25');
 
     if (!serverId || !table) {
       return NextResponse.json({ error: 'Server ID and table are required' }, { status: 400 });
@@ -71,7 +74,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Database settings not configured' }, { status: 400 });
     }
 
-    const limit = 50;
     const offset = (page - 1) * limit;
 
     // Connect to database
@@ -85,8 +87,10 @@ export async function GET(request: NextRequest) {
         connectTimeout: 10000
       });
 
-      // Sanitize table name
+      // Sanitize table name and sort column
       const tableName = mysql.escapeId(table);
+      const sortColumn = mysql.escapeId(sort);
+      const sortOrder = order.toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
 
       // Get total rows
       let countQuery = `SELECT COUNT(*) as total FROM ${tableName}`;
@@ -108,7 +112,7 @@ export async function GET(request: NextRequest) {
         const [countResult] = await connection.execute(countQuery, searchValues);
         const totalRows = (countResult as any[])[0].total;
         
-        dataQuery += ` ORDER BY id DESC LIMIT ? OFFSET ?`;
+        dataQuery += ` ORDER BY ${sortColumn} ${sortOrder} LIMIT ? OFFSET ?`;
         const [rows] = await connection.execute(dataQuery, [...searchValues, limit, offset]);
         
         // Get columns
@@ -126,7 +130,7 @@ export async function GET(request: NextRequest) {
         const [countResult] = await connection.execute(countQuery);
         const totalRows = (countResult as any[])[0].total;
         
-        dataQuery += ` ORDER BY id DESC LIMIT ? OFFSET ?`;
+        dataQuery += ` ORDER BY ${sortColumn} ${sortOrder} LIMIT ? OFFSET ?`;
         const [rows] = await connection.execute(dataQuery, [limit, offset]);
         
         // Get columns

@@ -3,14 +3,13 @@ import { db } from '@/lib/db'
 
 export async function GET(request: NextRequest) {
   try {
-    // Get real stats from database
+    // Get stats using Prisma
     const [
       totalUsers,
       totalServices,
       totalOrders,
       totalRevenue,
-      recentUsers,
-      servicesByType
+      recentUsers
     ] = await Promise.all([
       // Total users
       db.user.count({
@@ -25,7 +24,7 @@ export async function GET(request: NextRequest) {
       // Total orders
       db.order.count(),
       
-      // Total revenue from completed orders
+      // Total revenue
       db.order.aggregate({
         where: { status: 'COMPLETED' },
         _sum: { amount: true }
@@ -36,18 +35,11 @@ export async function GET(request: NextRequest) {
         where: {
           isActive: true,
           createdAt: {
-            gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) // 30 days ago
+            gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
           }
         }
-      }),
-      
-      // Services by type
-      db.service.groupBy({
-        by: ['type'],
-        where: { status: 'ACTIVE' },
-        _count: { type: true }
       })
-    ])
+    ]);
 
     const stats = {
       totalUsers,
@@ -56,11 +48,9 @@ export async function GET(request: NextRequest) {
       totalRevenue: totalRevenue._sum.amount || 0,
       recentUsers,
       recentServices: 0, // Will be calculated later
-      servicesByType: servicesByType.map(s => ({
-        type: s.type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
-        _count: { type: s._count.type }
-      })),
+      servicesByType: [], // Will be populated based on your services table structure
       uptime: "99.9%",
+      systemStatus: "online",
       lastUpdated: new Date().toISOString()
     }
 
@@ -68,7 +58,11 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Stats API error:', error)
     return NextResponse.json(
-      { error: 'Failed to fetch stats' },
+      { 
+        error: 'Failed to fetch stats',
+        message: error instanceof Error ? error.message : 'Unknown error',
+        systemStatus: "offline"
+      },
       { status: 500 }
     )
   }
